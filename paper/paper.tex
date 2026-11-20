@@ -1,0 +1,773 @@
+\documentclass[a4paper,onecolumn,11pt,unpublished]{quantumarticle}
+\pdfoutput=1
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{hyperref}
+
+% -----------------------------------------------------------------
+% NOTES FOR THE AUTHOR (delete this block before submission)
+% * Search for "TODO" for items that need your input or a check.
+% * New material compared with the previous draft:
+%   Corollary~\ref{cor:planted}, Corollary~\ref{cor:measures},
+%   Remark~\ref{rem:general}, and the related-work section.
+%   Check these proofs line by line.
+% * If AI tools were used to draft or check this work, add a
+%   disclosure in the Acknowledgments, following Quantum's policy.
+% -----------------------------------------------------------------
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{example}[theorem]{Example}
+
+\newcommand{\F}{\mathbb{F}_2}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\ket}[1]{|#1\rangle}
+\newcommand{\bra}[1]{\langle #1|}
+\newcommand{\braket}[2]{\langle #1|#2\rangle}
+\DeclareMathOperator{\rank}{rank}
+\DeclareMathOperator{\codim}{codim}
+\DeclareMathOperator{\poly}{poly}
+\DeclareMathOperator{\img}{im}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\T}{\mathsf{T}}
+\setlength{\emergencystretch}{2.5em}
+
+\begin{document}
+
+\title{Peaks reveal structure: a sharp purity--fidelity bound and exact sampling for third-level phase circuits}
+
+\author{Matteo De Francesco}
+\affiliation{University of Geneva, Switzerland} % TODO: department, address, e-mail, ORCID, co-authors
+
+\maketitle
+
+\begin{abstract}
+Peaked quantum circuits are a promising route to verifiable quantum advantage: a classical verifier only has to check that a few likely bitstrings show up. The structure that creates the peaks, however, may also make the circuit easy to simulate. We study this tension for circuits that apply one layer of diagonal gates from the third level of the Clifford hierarchy, such as $T$, controlled-$S$ and $CCZ$ gates, between two arbitrary Clifford circuits. Without further promises this family contains cubic IQP circuits and is believed to be hard to sample. We first prove a sharp relation between two standard magic measures on this family: the stabilizer purity $A_2$ and the stabilizer fidelity $F_S$ satisfy $A_2\ge F_S^3$, while for general pure states only $A_2\ge F_S^4$ holds. The exponent three cannot be lowered. We then show that peaks expose the hidden structure. Using an algorithmic version of the bound between slice rank and analytic rank of trilinear forms, a classical algorithm finds a certified decomposition into $\poly(1/\rho)$ stabilizer states when the output has collision probability $\rho$, and into $\poly(R)$ stabilizer states when the stabilizer extent is at most $R$. In both cases the full output distribution can be sampled exactly in polynomial space. The same holds when a single, possibly exponentially unlikely, branch of a canonical flag measurement is concentrated. As a consequence, a planted vanishing subspace of logarithmic codimension cannot stay hidden. The method tolerates logarithmically many $CCZ$ gates outside a commuting family, and we show that it fails for degree-four phases.
+\end{abstract}
+
+%=================================================================
+\section{Introduction}
+%=================================================================
+
+Sampling is a natural way to use a quantum device: prepare a state, measure it, and repeat the experiment. The difficulty is deciding whether the resulting samples demonstrate a quantum advantage. A classical verifier may be unable to calculate the probabilities of typical outputs, precisely because the proposed experiment is meant to be hard to simulate. Peaked circuits offer a possible way around this difficulty. If a generator knows a small set of unusually likely strings, their frequency provides a simple statistic with which to test the device~\cite{AZ24,Zha25,GMS25}. Such a test checks a particular feature of the distribution; it need not certify the entire output law.
+
+This approach raises a second question. Does the structure that makes certain outputs easy to recognize also make the circuit easy to simulate? Finding one likely string would not settle this: a classical sampler still has to reproduce the probabilities of all the other outputs. The question is particularly relevant when there are several peaks, whose locations may be hidden, with the remaining probability mass spread over exponentially many strings. Our aim is to identify a circuit family in which concentration alone forces a useful classical description of the full distribution.
+
+Related proposals hide a Clifford computation by local recompilation~\cite{Yan26}, plant an independent space in a cubic polynomial~\cite{BGHLQ26}, or create peaks in conditional distributions using error-correcting codes~\cite{DFGG25}. These provide motivation for studying what concentration reveals. Applying a simulation theorem to any particular proposal also requires checking its circuit description and promises; concentration by itself is not a security argument in either direction.
+
+\subsection{The problem and the circuit model}
+
+Let $p(y)$ be the probability of observing the bitstring $y$. We call the distribution multipeaked when some set of $K$ strings carries total probability at least $\mu$. The strings and their individual probabilities need not be known to the classical algorithm. The quantity we use is the \emph{collision probability}
+\[
+\kappa(p)=\sum_y p(y)^2,
+\]
+which is the probability that two independent samples agree. Cauchy--Schwarz gives
+\[
+\sum_{y\in\mathcal P}p(y)\ge\mu,\quad |\mathcal P|\le K
+\qquad\Longrightarrow\qquad
+\kappa(p)\ge\frac{\mu^2}{K}.
+\]
+This packages a multipeak promise into one numerical bound without specifying the peaks. For example, a polynomial number of strings carrying constant total mass gives an inverse-polynomial collision probability. The remaining mass is unrestricted.
+
+We study circuits of the form
+\begin{equation}\label{eq:circuit}
+\ket{\Psi}=C_{\rm out}\,D\,C_{\rm in}\ket{0^n},
+\end{equation}
+where $C_{\rm in}$ and $C_{\rm out}$ are explicit Clifford circuits and $D$ is a diagonal gate from the third level of the Clifford hierarchy. Clifford circuits preserve stabilizer states, which admit efficient classical descriptions. The diagonal gate supplies the non-Clifford part: it may be any product of polynomially many $T$, controlled-$S$, and $CCZ$ gates, together with diagonal Clifford gates. These diagonal gates commute. They form one diagonal stage, although implementing that stage may require many physical layers. Neither Clifford circuit is required to have bounded depth. This is the diagonal-magic-depth-one setting of Zhang and Zhang~\cite{ZZ24}, with the additional restriction on the diagonal gate.
+
+This restriction leaves a substantial family: it includes cubic IQP circuits, for which general efficient classical sampling is not expected under the usual complexity assumptions~\cite{BJS11,BMS16}. Our algorithms receive the explicit circuit and a numerical bound such as $\kappa(p)\ge\rho$. They are not given peak locations, a stabilizer decomposition, copies of the state, or a secret key. An opaque compiled gate list is not automatically an accessible description of the form~\eqref{eq:circuit}; recognizing such a description is a separate problem.
+
+\subsection{An intuitive guide to the arguments}
+
+\paragraph{The information is in the phases.}
+The stabilizer input can be put into an affine normal form. After changing coordinates on its support and absorbing Clifford operations into the readout, the essential state has the form
+\[
+\ket{\psi_P}=2^{-r/2}\sum_{x\in\F^r}\omega^{P(x)}\ket{x},
+\qquad \omega=e^{i\pi/4},
+\]
+possibly with stabilizer ancillas, where $P$ is a weighted cubic polynomial modulo eight. Every computational-basis amplitude has the same magnitude. The polynomial records their relative phases, and the final Clifford turns interference between these phases into the measured probabilities. Thus visible peaks need not come from a sparse state before the readout.
+
+\paragraph{Differences turn phases into matrices.}
+Compare the phase at $x$ with the phase at $x+a$. The ratio is a quadratic phase, whose Fourier spectrum has equal magnitudes on an affine support. A binary matrix $M_a$ determines the size of that support: its nonzero squared Fourier coefficients are $2^{-\rank M_a}$. This is the same quadratic-phase algebra that describes Pauli measurements of graph states. Here it is applied to derivatives of a cubic phase. The matrices $M_a$ fit together as contractions of a symmetric trilinear tensor $T$, obtained by taking three discrete differences of $P$.
+
+The average
+\[
+\beta(T)=\E_a\,2^{-\rank M_a}
+\]
+measures how often these contractions have substantial kernels. It equals the stabilizer purity of the phase state; the Boolean cubic identity is due to Kagamihara and Tsuchiya~\cite{KT26}. Output concentration gives a related lower bound on this average. For an arbitrary Clifford readout, the relevant tensor must first be restricted to the translation directions of the pulled-back measured Pauli group. Lemma~\ref{lem:collision} makes this dependence on the measurement explicit.
+
+\paragraph{A few coordinates contain the obstruction.}
+The useful certificate is a linear subspace $U$ on which $T$ vanishes on every triple of directions. If $U$ has codimension $d$, fixing $d$ suitable linear coordinates selects an affine coset of $U$. On each such coset, the phase is Clifford and the normalized restricted state is a stabilizer state. There are $2^d$ cosets, so small codimension gives a short exact description, as in simulation using a known planted independent space~\cite{BGHLQ26}.
+
+Bias-to-structure results explain why such a subspace exists~\cite{HS10,Lam25}. We adapt Lampert's argument into a recovery procedure: sample pairs with zero contraction, use matrix kernels to remove the remaining interactions, and check the resulting subspace by linear algebra. The certificate can be verified directly even though the useful directions were initially unknown. If a subspace was planted, the algorithm may find a different one. What matters for simulation is its dimension and vanishing property.
+
+\paragraph{The components still interfere.}
+The coset description is a coherent sum, with explicit relative phases. Choosing a stabilizer component at random would generally lose the interference created by the final Clifford. Instead, we add the component amplitudes and use the gate-by-gate sampling method of Bravyi, Gosset and Liu~\cite{BGL22}. This produces samples from the whole output law, including its diffuse part. The cost grows with the number of components, which becomes polynomial under the concentration promises considered here.
+
+\paragraph{Concentration can be conditional.}
+Many uniform output bits can make the full distribution appear diffuse even when some conditional distributions are sharply concentrated. For the canonical flags defined by the Clifford readout, conditioning selects an affine coset, and all sectors share the same restricted third-derivative tensor. One concentrated sector therefore gives information about the tensor used by every sector. The algorithm need not locate or wait for that potentially rare sector: it recovers the common structure, samples the uniform flag, and simulates the chosen conditional law. This gives short decompositions within sectors; it need not give a short coherent decomposition of the entire state.
+
+The paper also proves a sharp relation between stabilizer purity and the largest squared overlap with a stabilizer state. Its proof uses the phase and support structure just described, but does not require the recovery algorithm. We state this inequality first, then develop the constructive consequences. This separates the new quantitative statement from the established algebraic and simulation tools that make it useful.
+
+
+\subsection{Main results}
+
+\paragraph{A sharp purity--fidelity bound.}
+Two standard ways to measure how far a pure state $\psi$ is from the stabilizer states are the \emph{stabilizer purity} $A_2(\psi)$, the normalized fourth moment of its Pauli expectation values, and the \emph{stabilizer fidelity} $F_S(\psi)$, its largest squared overlap with a stabilizer state. In entropic language, $M_2=-\log A_2$ is the stabilizer $2$-R\'enyi entropy~\cite{LOH22} and $D_{\min}=-\log F_S$ is the min-relative entropy of magic~\cite{LW22}. For every pure state $A_2\ge F_S^4$~\cite{HP23,HLK24}, and the exponent four is asymptotically attained (Remark~\ref{rem:general}). Our first result improves the exponent for the family~\eqref{eq:circuit}.
+
+\begin{quote}
+\textbf{Theorem~\ref{thm:sharp} (informal).} Every state of the form~\eqref{eq:circuit} satisfies $A_2\ge F_S^3$, that is, $M_2\le 3D_{\min}$. The exponent three cannot be lowered, even if a constant prefactor is allowed.
+\end{quote}
+
+The exponent three comes from the support of a stabilizer state. Suppose a stabilizer has squared overlap $F$ with the flat phase state, and its affine support contains a fraction $w$ of all computational-basis strings. Flatness gives $F\le w$. Restricting to that support and removing its Clifford phase produces a state with a Hadamard-basis outcome of probability $F/w$. The quadratic derivative calculation therefore lower-bounds the restricted tensor bias by $(F/w)^2$. Passing back to the full space costs at most $w^3$: one factor for choosing a direction parallel to the support, and two for restoring rows and columns of the contraction matrix. Hence
+\[
+A_2\ge w^3(F/w)^2=wF^2\ge F^3.
+\]
+Section~\ref{sec:sharp} makes this argument precise and gives a controlled quadratic-phase family showing that three is optimal. This is an improvement specific to the circuit family; it is not a consequence of the general fourth-power bound or of the recovery algorithm.
+
+\paragraph{Recovering the structure.}
+The stabilizer purity of $D\ket{+^n}$ equals the bias $\beta(T)$ of the contraction tensor (Proposition~\ref{prop:purity}; the Boolean case is due to Kagamihara and Tsuchiya~\cite{KT26}), and $-\log\beta(T)$ is the analytic rank of $T$~\cite{Lov19}. Theorem~\ref{thm:recovery} turns a lower bound $\beta(T)\ge\beta_0$ into an explicit subspace $U$ with $T|_U=0$ and $\codim U\le 5\log(1/\beta_0)+O(1)$, in expected time $\poly/\beta_0$. The output is checked by linear algebra, so it is correct even when the promise is false. The constant five equals the best known constant over $\F$ in the closely related inequality between slice rank and analytic rank~\cite{Lam25,MZ26}. A direct consequence (Corollary~\ref{cor:planted}) is that if $T$ vanishes on \emph{some} subspace of codimension $d$, then a certified subspace of codimension at most $15d+14$ can be found in expected time $\poly\cdot 2^{3d}$. Thus logarithmic planted codimension guarantees a recoverable simulation certificate, although the returned subspace need not be the originally planted one.
+
+\paragraph{Exact sampling.}
+Together with the gate-by-gate sampling method of Bravyi, Gosset and Liu~\cite{BGL22}, these structural results give exact classical samplers under the promises listed in Table~\ref{tab:results}. They sample the complete output distribution, including its diffuse part. Each also has a bounded-time version with total-variation error $2^{-u}$, at an extra cost polynomial in $u$.
+
+\begin{table}[t]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.48\linewidth}ll@{}}
+\toprule
+Promise (only a numerical bound is given) & Exact sampling time & Result\\
+\midrule
+Collision probability $\kappa(p)\ge\rho$ & $\poly\cdot\rho^{-5}$ & Thm.~\ref{thm:collision}\\
+$K$ unknown strings carry total probability $\mu$ & $\poly\cdot K^5\mu^{-10}$ & Thm.~\ref{thm:collision}\\
+Stabilizer purity $A_2\ge\alpha$ & $\poly\cdot\alpha^{-5}$ & Thm.~\ref{thm:extent}\\
+Stabilizer extent $\xi\le R$ & $\poly\cdot R^{15}$ & Thm.~\ref{thm:extent}\\
+One canonical flag branch has collision probability $\ge\rho$ & $\poly\cdot\rho^{-5}$ & Thm.~\ref{thm:flag}\\
+$T$ vanishes on some subspace of codimension $d$ & $\poly\cdot 2^{15d}$ & Cor.~\ref{cor:planted}\\
+$t$ $CCZ$ gates outside a commuting family, and $\kappa(p)\ge\rho$ & $\poly\cdot 8^t(5/2)^{20t}\rho^{-5}$ & Thm.~\ref{thm:defect}\\
+\bottomrule
+\end{tabular}
+\caption{Exact classical samplers for the circuits~\eqref{eq:circuit}. Here $\poly$ is a polynomial in the number of qubits, the circuit size, and the bit length of the promised bound. Peak locations, stabilizer decompositions and witnesses are never part of the input.}
+\label{tab:results}
+\end{table}
+
+The canonical-flag promise deserves a word. The full collision probability can be exponentially small for a trivial reason: the output may contain many uniformly random bits. Theorem~\ref{thm:flag} shows that, for a canonical set of such bits fixed by the Clifford readout, it is enough that a \emph{single} conditional distribution is concentrated, even if its branch has probability $2^{-m}$. The canonical choice is essential, and Section~\ref{sec:flag} explains why arbitrary flag bits would not work.
+
+\paragraph{Limits of the method.}
+Theorem~\ref{thm:defect} shows that the method survives a logarithmic number of $CCZ$ gates outside a commuting family; this parameter can be read off the gate list. Proposition~\ref{prop:quartic} shows that degree-four phases break the approach: a quartic circuit can have two easy peaks of probability $1/4$ while a conditional branch of probability $1/2$ samples an arbitrary cubic IQP circuit.
+
+\subsection{Relation to prior work}
+
+\paragraph{Magic of phase and hypergraph states.}
+Chen, Yan and Zhou computed stabilizer R\'enyi entropies of hypergraph states~\cite{CYZ24}, and Kagamihara and Tsuchiya expressed the stabilizer R\'enyi entropy of $3$-uniform hypergraph states through matrix ranks~\cite[Theorem~1]{KT26}. Proposition~\ref{prop:purity} is the same identity for weighted third-level phases, proved by the same Fourier argument. Liu and Winter studied the min-relative entropy of magic of hypergraph states through their nonquadraticity~\cite{LW22}. General inequalities between $M_2$ and $D_{\min}$ appear in Refs.~\cite{HP23,HLK24,TFH25}. To our knowledge, the cubic exponent for this family and its optimality are new.
+
+\paragraph{Bias and structure.}
+That biased low-degree polynomials have low-rank structure goes back to Green and Tao~\cite{GT09}, with effective bounds for cubic polynomials by Haramaty and Shpilka~\cite{HS10}. For trilinear forms, the slice rank is bounded linearly by the analytic rank~\cite{AKZ21,CM22}. Lampert gave an elementary proof with leading constant five~\cite{Lam25}, and Moshkovitz and Zhu improved the constant to $3+2/(q-1)$ over $\mathbb{F}_q$~\cite{MZ26}, which again equals five for $q=2$. Theorem~\ref{thm:recovery} is an algorithmic version of Lampert's argument for symmetric, not necessarily alternating, forms. We add a randomized procedure with a checkable stopping rule; we do not improve the constant.
+
+\paragraph{Simulation of phase circuits.}
+Low-rank stabilizer decompositions~\cite{BBC19} and the polynomial picture of IQP circuits~\cite{Mon17} give simulation algorithms whose cost grows with the number of non-Clifford gates, or with the rank of the cubic part. Zhang and Zhang showed that circuits of diagonal magic depth one admit polynomial-time additive-error estimates of amplitudes, Pauli observables and logarithmic-size marginals~\cite{ZZ24}. Bl\"aser, Gullans, Hangleiter, Liu and Qiao simulate cubic IQP circuits with an $h$-dimensional planted independent space in time $2^{n-h}$, and they attack the planted problem through rank deficiencies of Hessian matrices when $h\ge(1/2+\epsilon)n$~\cite{BGHLQ26}. In the Boolean case, their independent space is a subspace on which our tensor $T$ vanishes, and our Lemma~\ref{lem:kernel} also looks for directions with low-rank contraction matrices, which are the cubic parts of Hessians. The differences are the regime and the guarantee. Their attack is analysed for random planted instances with spaces of linear size, while Theorem~\ref{thm:recovery} is a worst-case, certified statement that becomes efficient at logarithmic codimension. Our results do not affect their conjectures, which concern codimension linear in $n$.
+
+\paragraph{Peaked shallow circuits.}
+Bravyi, Gosset and Liu gave quasi-polynomial samplers for peaked circuits of constant depth~\cite{BGL24}. Coudron, Gullans, Nelson, Rajakumar and Tan gave polynomial-time additive-error estimates of output probabilities for constant-depth circuits with arbitrary connectivity~\cite{CGN26}. Building on this, Zhang reports a polynomial-time sampler for constant-depth circuits whose largest output probability is at least $n^{-k}$, with total-variation error at least $n^{-k}$~\cite{Zha26}. Since $p_{\max}\ge\mu/K$ when $K$ strings carry probability $\mu$, this covers inverse-polynomial multipeak concentration at constant physical depth. The two lines of work overlap only for circuits that have constant physical depth and also belong to the family~\eqref{eq:circuit}. Our results allow Clifford circuits of any depth, give the exact output law, and also apply under the purity, extent and flag promises; the flag example of Section~\ref{sec:flag} has $p_{\max}=2^{-m}$. Conversely, Ref.~\cite{Zha26} allows general gate sets.
+
+\paragraph{Approximate simulation.}
+Inverse-polynomial concentration already allows approximate simulation of the family~\eqref{eq:circuit}. Its amplitudes are normalized cubic exponential sums that can be estimated by sampling, and heavy-output search~\cite{SV13} combined with sparsification of stabilizer decompositions~\cite{BBC19} gives approximate samplers with inverse-polynomial error. Our results therefore do not create a new obstruction to sample-only advantage with inverse-polynomial gaps. They add explicit certificates, the exact output law, polynomial space, and a cost that depends only logarithmically on the target precision. We regard the structural statements (Theorem~\ref{thm:sharp}, Corollaries~\ref{cor:planted} and~\ref{cor:measures}, and Theorem~\ref{thm:flag}) as the main contribution, and exact sampling as their most direct algorithmic consequence.
+
+\paragraph{Learning.}
+Bounded stabilizer extent is also a useful assumption in learning, where recent algorithms learn states of bounded extent efficiently from copies~\cite{AD25,AD26,ADGG26}. Our algorithms work from the classical circuit description instead. Recent bounds relate stabilizer rank to stabilizer extent~\cite{SL26} and to stabilizer fidelity~\cite{MT24}; Corollary~\ref{cor:measures} goes in the opposite direction for our family.
+
+\paragraph{What is new.}
+The purity identity, the bias-to-structure argument behind Theorem~\ref{thm:recovery}, and the gate-by-gate sampler are known; we adapt them to weighted phases. New in this paper are the sharp inequality of Theorem~\ref{thm:sharp} and its optimality, the corollaries on planted subspaces and on magic measures, the exact samplers under the purity, extent and canonical-flag promises, and the extension to a few exceptional gates together with its degree-four boundary.
+
+\subsection{Consequences for verification}
+
+Consider any acceptance rule that a classical verifier computes from the public instance and the returned sample. An exact sampler reproduces the acceptance probability of the ideal quantum experiment exactly, and the bounded-time sampler reproduces it up to its total-variation error. Under each promise of Table~\ref{tab:results} with polynomial parameters, there is therefore no sample-only gap between quantum devices and polynomial-time classical algorithms. In the language of planted structures: for a scheme built on circuits~\eqref{eq:circuit} to have a chance of being secure, every vanishing subspace of $T$ must have super-logarithmic codimension, the stabilizer extent must be super-polynomial, and every canonical branch of the output must have small collision probability. This is a consequence of simulation, not a security proof for any scheme. Constructions that already meet these conditions, such as planted independent spaces of linear codimension~\cite{BGHLQ26}, are outside the scope of our results, and so are circuits with continuous rotation angles, interactive protocols, and noisy devices. We also do not claim that arbitrary compilers produce circuits that satisfy our promises.
+
+\paragraph{Organization.}
+Section~\ref{sec:setting} sets up notation and proves three basic facts. Section~\ref{sec:sharp} proves the sharp purity--fidelity bound. Section~\ref{sec:recovery} recovers a vanishing subspace from a bias bound. Section~\ref{sec:sampling} turns this subspace into exact samplers, and Section~\ref{sec:flag} treats concentrated branches. Section~\ref{sec:defect} handles exceptional gates and shows the degree-four barrier. Section~\ref{sec:discussion} discusses open problems, and Appendix~\ref{app:checks} describes the finite checks we ran.
+
+%=================================================================
+\section{Setting and three basic facts}\label{sec:setting}
+%=================================================================
+
+All vector spaces and matrix ranks are over $\F$, and all logarithms are base two. When bits appear in arithmetic modulo eight, we identify them with the integers $0$ and $1$. We write $\omega=e^{i\pi/4}$ and $x\cdot y=\sum_ix_iy_i \bmod 2$.
+
+\subsection{Weighted phases and the public model}
+
+We consider phase polynomials
+\begin{equation}\label{eq:phase}
+P(x)=P_0+\sum_i\ell_ix_i+2\sum_{i<j}q_{ij}x_ix_j+4\sum_{i<j<k}c_{ijk}x_ix_jx_k \pmod 8,
+\end{equation}
+with $\ell_i\in\Z_8$, $q_{ij}\in\Z_4$ and $c_{ijk}\in\F$, and the diagonal gate $D_P\ket{x}=\omega^{P(x)}\ket{x}$. A $T$ gate on qubit $i$ contributes $\ell_i=1$, a controlled-$S$ gate contributes $q_{ij}=1$, and a $CCZ$ gate contributes $c_{ijk}=1$; diagonal Clifford gates contribute even values of $\ell_i$ and $q_{ij}$. This is the standard description of diagonal gates in the third level of the Clifford hierarchy~\cite{CGK17}. We write
+\[
+\ket{\psi_P}=D_P\ket{+^n}=2^{-n/2}\sum_{x\in\F^n}\omega^{P(x)}\ket{x}.
+\]
+This state is \emph{flat}: all its computational-basis amplitudes have modulus $2^{-n/2}$.
+
+The form~\eqref{eq:phase} is preserved by affine substitutions $x=x_0+Bt$. To see this, expand each bit of $x_0+Bt$ as an integer polynomial in $t$ using $a\oplus b=a+b-2ab$. Every monomial of degree $r$ then comes with a factor $2^{r-1}$, so after multiplication by the coefficients in~\eqref{eq:phase} all monomials of degree four or more vanish modulo eight, and the remaining ones have the form~\eqref{eq:phase}. The new coefficients can be computed by evaluating $P$ on strings of Hamming weight at most three.
+
+\paragraph{The public model.}
+We study the distribution $p(y)=|\bra{y}W\ket{\psi_P}|^2$, where $W$ is an explicit Clifford circuit of size $s$. This covers the circuits~\eqref{eq:circuit}. Indeed, the stabilizer state $C_{\rm in}\ket{0^n}$ can be written as $V(Q\ket{+^r}\otimes\ket{0^{n-r}})$, where $V$ is an affine permutation of the computational basis and $Q$ is a diagonal Clifford gate, and both can be computed efficiently~\cite{DD03}. Since $D_PV=VD_{P\circ V}$, it suffices to restrict $P\circ V$ to strings of the form $(z,0)$, to extend the result to the last $n-r$ variables without dependence on them, and to set $W=C_{\rm out}V(Q\otimes H^{\otimes(n-r)})$. No postselection is needed.
+
+\subsection{The contraction tensor}
+
+For $a\in\F^n$ let $\Delta_aP(x)=P(x+a)-P(x)\bmod 8$. Three differences give
+\begin{equation}\label{eq:third}
+\Delta_a\Delta_b\Delta_cP(x)=4\,T(a,b,c)\pmod 8
+\end{equation}
+for a symmetric trilinear form $T$ over $\F$ that does not depend on $x$. In the standard basis,
+\[
+T_{iii}=\ell_i\bmod 2,\qquad T_{iij}=T_{ijj}=q_{ij}\bmod 2,\qquad T_{ijk}=c_{ijk}\quad(i,j,k\ \text{distinct}),
+\]
+and the other entries follow by symmetry. The tensor need not be alternating: a single $T$ gate already gives $T_{iii}=1$. The diagonal entry appears because a linear term $\ell_ix_i$ has third difference $4\ell_ia_ib_ic_i$ modulo eight, again by $x\oplus a=x+a-2ax$.
+
+For $a\in\F^n$ let $M_a$ be the symmetric matrix of the bilinear form $T(a,\cdot,\cdot)$. The \emph{bias} of $T$ is
+\begin{equation}\label{eq:bias}
+\beta(T)=\E_a\,2^{-\rank M_a}=\Pr_{a,b}\left[M_ab=0\right],
+\end{equation}
+where $a$ and $b$ are uniform in $\F^n$. The second expression holds because $\Pr_b[M_ab=0]=|\ker M_a|/2^n$. The quantity $-\log\beta(T)$ is the analytic rank of $T$~\cite{Lov19}. For a subspace $U$ with basis matrix $B$, we write $T|_U$ for the form $(u,v,w)\mapsto T(Bu,Bv,Bw)$, so that $\beta(T|_U)=\E_{u}2^{-\rank(B^\T M_{Bu}B)}$ with $u$ uniform. The next lemma explains why vanishing subspaces matter.
+
+\begin{lemma}[Cosets of a vanishing subspace]\label{lem:coset}
+Let $U$ have basis matrix $B$ and suppose that $T|_U=0$. Then for every $x_0\in\F^n$ there are $g_0\in\Z_8$, $\lambda\in\Z_4^{\dim U}$ and a quadratic form $Q$ over $\F$ such that $\omega^{P(x_0+Bt)}=\omega^{g_0}\,i^{\lambda\cdot t}\,(-1)^{Q(t)}$, with $\lambda\cdot t$ computed in $\Z_4$. In particular, the normalized restriction of $\ket{\psi_P}$ to the coset $x_0+U$ is a stabilizer state times an explicit eighth root of unity.
+\end{lemma}
+
+\begin{proof}
+The function $g(t)=P(x_0+Bt)$ has the form~\eqref{eq:phase} in the variables $t$. Since $\Delta_ug(t)=(\Delta_{Bu}P)(x_0+Bt)$, its contraction tensor is $T|_U=0$. Hence all its linear coefficients and all its quadratic coefficients are even, and it has no cubic terms. Writing them as $2\lambda_i$ and $2Q_{ij}$ gives the claim.
+\end{proof}
+
+\subsection{Magic measures and collision probability}
+
+For a pure $n$-qubit state $\psi$ we use
+\[
+A_2(\psi)=2^{-n}\sum_{Q\in\{I,X,Y,Z\}^{\otimes n}}\bra{\psi}Q\ket{\psi}^4,\qquad F_S(\psi)=\max_{S}|\braket{S}{\psi}|^2,
+\]
+where the maximum is over stabilizer states, together with the stabilizer extent $\xi(\psi)$, the minimum of $(\sum_j|\alpha_j|)^2$ over all decompositions $\ket{\psi}=\sum_j\alpha_j\ket{S_j}$ into stabilizer states, and the stabilizer rank $\chi(\psi)$, the minimum number of terms in such a decomposition~\cite{BBC19}. All four are invariant under Clifford unitaries. Taking the inner product of a decomposition with $\psi$ gives $1\le\sum_j|\alpha_j||\braket{S_j}{\psi}|\le\sqrt{F_S}\sum_j|\alpha_j|$, hence $\xi\ge 1/F_S$.
+
+For a distribution $p$ we write $\kappa(p)=\sum_yp(y)^2$ for its collision probability. If an unknown set of $K$ strings has total probability at least $\mu$, the Cauchy--Schwarz inequality gives $\kappa(p)\ge\mu^2/K$. We also have $p_{\max}^2\le\kappa(p)\le p_{\max}$. A multipeak promise therefore yields a collision bound without revealing where the peaks are.
+
+\subsection{Three basic facts}
+
+The first fact says that every first derivative of a weighted phase is a quadratic phase with a flat Fourier spectrum.
+
+\begin{lemma}[Flat derivative spectra]\label{lem:flat}
+Fix $a\in\F^n$, let $q_a(x)=\omega^{\Delta_aP(x)}$ and $\hat q_a(b)=\E_x\,q_a(x)(-1)^{b\cdot x}$. Then $|\hat q_a(b)|^2\in\{0,2^{-\rank M_a}\}$ for every $b$, and the set of $b$ with $\hat q_a(b)\neq0$ is a coset of $\img M_a$.
+\end{lemma}
+
+\begin{proof}
+Write $q=q_a$. By~\eqref{eq:third} with $x=0$, we have $\Delta_x\Delta_h(\Delta_aP)(0)=4T(a,x,h)$, that is,
+\[
+q(x+h)\,q(0)=q(x)\,q(h)\,(-1)^{T(a,x,h)}.
+\]
+Expanding the square and substituting $y=x+h$ gives $|\hat q(b)|^2=\E_h(-1)^{b\cdot h}g(h)$ with $g(h)=\E_x\,q(x)\overline{q(x+h)}$. By the identity above and $|q|=1$, we get $g(h)=q(0)\overline{q(h)}\,\E_x(-1)^{T(a,x,h)}$, which vanishes unless $h\in\ker M_a$. On $\ker M_a$ the same identity shows that $\chi(h)=q(0)\overline{q(h)}$ is multiplicative, and since $h+h=0$ it takes values $\pm1$. So $\chi(h)=(-1)^{c\cdot h}$ for some $c$, and
+\[
+|\hat q(b)|^2=2^{-n}\sum_{h\in\ker M_a}(-1)^{(b+c)\cdot h},
+\]
+which equals $|\ker M_a|/2^n=2^{-\rank M_a}$ if $b+c\in(\ker M_a)^\perp=\img M_a$, and zero otherwise.
+\end{proof}
+
+\begin{proposition}[Purity identity; Boolean case in~\cite{KT26}]\label{prop:purity}
+For every phase polynomial~\eqref{eq:phase}, $A_2(\psi_P)=\beta(T)$.
+\end{proposition}
+
+\begin{proof}
+Up to a phase, every Pauli operator is $X^aZ^b$, and a direct computation gives $\bra{\psi_P}X^aZ^b\ket{\psi_P}=\overline{\hat q_a(b)}$. By Lemma~\ref{lem:flat}, for fixed $a$ there are $2^{\rank M_a}$ nonzero values, each with fourth power $2^{-2\rank M_a}$, so they contribute $2^{-\rank M_a}$ in total. Averaging over $a$ gives $\beta(T)$.
+\end{proof}
+
+The third fact is the bridge from peaks to structure: a concentrated output forces many contraction matrices to have small rank.
+
+\begin{lemma}[Collision in a Clifford basis]\label{lem:collision}
+Let $W$ be a Clifford unitary and $p(y)=|\bra{y}W\ket{\psi_P}|^2$. Let $G\subseteq\F^{2n}$ be the set of labels $(a,b)$ of the Pauli operators $\pm X^aZ^b$ that equal $W^\dagger Z^zW$ for some $z\in\F^n$, let $L=\{a:(a,b)\in G\}$ be its projection on the first component, and let $c=n-\dim L$. Then
+\begin{equation}\label{eq:collision}
+\kappa(p)\le 2^{-c}\,\beta(T|_L).
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Since $\ket{y}\!\bra{y}=2^{-n}\sum_z(-1)^{y\cdot z}Z^z$, Parseval's identity gives
+\[
+\kappa(p)=2^{-n}\sum_{(a,b)\in G}|\bra{\psi_P}X^aZ^b\ket{\psi_P}|^2.
+\]
+The set $G$ is a Lagrangian subspace of $\F^{2n}$: it has $2^n$ elements, which pairwise commute. Hence $(0,b)\in G$ if and only if $b\in L^\perp$. Indeed, $(0,b)$ commutes with all of $G$ exactly when $b\perp L$, and maximality of $G$ gives the converse. So for every $a\in L$, the labels $(a,b)\in G$ form a coset of $L^\perp$.
+
+By Lemma~\ref{lem:flat}, the values $|\bra{\psi_P}X^aZ^b\ket{\psi_P}|^2=|\hat q_a(b)|^2$ equal $2^{-\rank M_a}$ on a coset of $\img M_a$ and vanish elsewhere. Let $B$ be a basis matrix of $L$. Since $(L^\perp+\img M_a)^\perp=L\cap\ker M_a$, a coset of $L^\perp$ meets a coset of $\img M_a$ in either no point or in $|L^\perp\cap\img M_a|=2^{\rank M_a-\rank(B^\T M_a)}$ points. The contribution of a fixed $a\in L$ is therefore at most $2^{-\rank(B^\T M_a)}\le2^{-\rank(B^\T M_aB)}$. Summing over the $2^{n-c}$ elements of $L$ gives~\eqref{eq:collision}.
+\end{proof}
+
+%=================================================================
+\section{A sharp purity--fidelity bound}\label{sec:sharp}
+%=================================================================
+
+\begin{theorem}[Sharp purity--fidelity bound]\label{thm:sharp}
+Every state $\psi$ in the Clifford orbit of the states $\ket{\psi_P}$ satisfies
+\begin{equation}\label{eq:sharp}
+A_2(\psi)\ge F_S(\psi)^3 .
+\end{equation}
+Conversely, for every $p<3$ and every $C>0$ there are states in this family with $A_2(\psi)<C\,F_S(\psi)^p$.
+\end{theorem}
+
+\begin{proof}
+All quantities are Clifford invariant, so we may take $\psi=\psi_P$. Fix a stabilizer state $S$. Its computational-basis support is an affine subspace $s+V$ of some codimension $c$, on which its amplitudes are $2^{-(n-c)/2}$ times a diagonal Clifford phase~\cite{DD03}. Let $F=|\braket{S}{\psi_P}|^2$. Because $\psi_P$ is flat, its weight on $s+V$ is $2^{-c}$, and the Cauchy--Schwarz inequality gives $F\le 2^{-c}$.
+
+Now restrict $\psi_P$ to $s+V$. Let $B$ be a basis matrix of $V$, and let $\psi'$ be the $(n-c)$-qubit state with amplitudes $2^{-(n-c)/2}\omega^{P(s+Bz)}$ multiplied by the complex conjugate of the phase of $S$ at $s+Bz$. Writing out both inner products shows $\braket{+^{n-c}}{\psi'}=2^{c/2}\braket{S}{\psi_P}$, so
+\[
+|\braket{+^{n-c}}{\psi'}|^2=2^cF .
+\]
+The state $\psi'$ is again a flat weighted phase state, and since the phase of $S$ is a diagonal Clifford phase, its contraction tensor is $T|_V$. Measuring $\psi'$ in the Hadamard basis gives the all-zero outcome with probability $2^cF$, so the collision probability of this measurement is at least $2^{2c}F^2$. Lemma~\ref{lem:collision} with $W=H^{\otimes(n-c)}$, for which the projection $L$ is the whole space, bounds the same collision probability by $\beta(T|_V)$. Therefore
+\[
+\beta(T|_V)\ge 2^{2c}F^2 .
+\]
+Finally we return to the full space. In the average~\eqref{eq:bias} we keep only the directions $a\in V$, which have probability $2^{-c}$. For $u\in V$, write $M_u$ in a basis that extends the columns of $B$. Then $M_u$ contains $B^\T M_uB$ as a block, and the $c$ extra rows and $c$ extra columns raise the rank by at most $2c$. Hence
+\[
+\beta(T)\ \ge\ 2^{-c}\cdot2^{-2c}\,\beta(T|_V)\ \ge\ 2^{-c}F^2\ \ge\ F^3,
+\]
+where the last step uses $F\le2^{-c}$. Maximizing over $S$ and using Proposition~\ref{prop:purity} proves~\eqref{eq:sharp}.
+
+For the converse, consider the $(2m+1)$-qubit Boolean phase $P=4g_m$ with
+\[
+g_m(z,x)=z\sum_{j=1}^m x_{2j-1}x_{2j}.
+\]
+Let $J$ be the matrix that swaps $x_{2j-1}$ and $x_{2j}$ for every $j$. For a direction $(a,y)\in\F\times\F^{2m}$, the contraction matrix is
+\[
+M_{(a,y)}=\begin{pmatrix}0&(Jy)^\T\\ Jy&aJ\end{pmatrix}.
+\]
+Its rank is $0$ for $(a,y)=(0,0)$, it is $2$ when $a=0$ and $y\neq0$, and it is $2m$ when $a=1$, because then the first row equals $y^\T$ times the lower block rows, using $y^\T Jy=0$. Therefore
+\begin{equation}\label{eq:sharpness}
+A_2(\psi_{4g_m})=\frac{1}{2\cdot4^m}\left(1+\frac{4^m-1}{4}+1\right)=\frac{1+7\cdot4^{-m}}{8}.
+\end{equation}
+The stabilizer state $\ket{0}\ket{+^{2m}}$ has squared overlap $1/2$ with $\psi_{4g_m}$. Now take $r$ copies. The purity is multiplicative, so $A_2(\psi_{4g_m}^{\otimes r})$ is the $r$-th power of~\eqref{eq:sharpness}, while a product stabilizer state shows $F_S(\psi_{4g_m}^{\otimes r})\ge2^{-r}$. Given $0\le p<3$, choose $m$ so large that $2^p(1+7\cdot4^{-m})/8<1$. Then
+\[
+\frac{A_2(\psi_{4g_m}^{\otimes r})}{F_S(\psi_{4g_m}^{\otimes r})^p}\le\left(2^p\,\frac{1+7\cdot4^{-m}}{8}\right)^r\longrightarrow0\qquad(r\to\infty).
+\]
+For $p<0$ the same conclusion follows from $F_S^p\ge1$ and $A_2^r\to0$. No multiplicativity of the stabilizer fidelity is needed.
+\end{proof}
+
+The example has a simple interpretation. The state
+\[
+\ket{\psi_{4g_m}}=\big(\ket{0}\ket{+^{2m}}+\ket{1}\ket{G_m}\big)/\sqrt2,
+\]
+where $\ket{G_m}$ is a product of $m$ two-qubit graph states, is an equal superposition of $K=2$ stabilizer states that are far apart. Theorem~\ref{thm:sharp} also pins down its fidelity: $1/2\le F_S(\psi_{4g_m})\le\big((1+7\cdot4^{-m})/8\big)^{1/3}$.
+
+In entropic form, Theorem~\ref{thm:sharp} reads $M_2\le3D_{\min}$. For comparison, the general bound $A_2\ge F_S^4$ follows by averaging the signed Pauli expectations over the stabilizer group of a maximizing stabilizer state, applying the power-mean inequality, and enlarging the sum to all Pauli operators~\cite{HLK24,TFH25}. Our improvement uses two features of the family: the weight that a flat state can put on the support of a stabilizer state is limited by that support, and every derivative has a flat quadratic spectrum. The next remark shows that the improvement is a genuine feature of the family.
+
+\begin{remark}[The exponent four is the right one in general]\label{rem:general}
+Fix $0<F<1$, let $\phi$ be a Haar-random $n$-qubit state, and let $\psi$ be the normalization of $\sqrt F\ket{0^n}+\sqrt{1-F}\ket{\phi}$. With high probability, all Pauli expectation values of $\phi$ and all overlaps of $\phi$ with stabilizer states have modulus at most $\poly(n)\,2^{-n/2}$; for the overlaps this follows from a union bound over the $2^{O(n^2)}$ stabilizer states. Then every Pauli $Z^b$ has $\bra{\psi}Z^b\ket{\psi}=F+o(1)$, every other Pauli has expectation $O(\poly(n)2^{-n/2})$, and every stabilizer state has squared overlap at most $F+o(1)$ with $\psi$. Hence $A_2(\psi)=F^4+o(1)$ and $F_S(\psi)=F+o(1)$, so $M_2/D_{\min}\to4$ as $n\to\infty$. % TODO: verify this sketch, or remove the remark.
+\end{remark}
+
+%=================================================================
+\section{Recovering a vanishing subspace}\label{sec:recovery}
+%=================================================================
+
+Lemma~\ref{lem:collision} and Theorem~\ref{thm:sharp} turn peaks and low magic into a lower bound on $\beta(T)$. This section turns such a bound into an explicit object: a subspace on which $T$ vanishes. The existence of such a subspace follows from the known bounds between slice rank and analytic rank~\cite{AKZ21,CM22,Lam25,MZ26}. For simulation we need more: we must find the subspace, and we must know when we have found it. We follow the elementary route of Lampert~\cite{Lam25}, which combines a zero-set averaging argument with a lemma of Haramaty and Shpilka on spaces of low-rank bilinear forms~\cite[Lemma~3.7]{HS10}, and we make each step algorithmic.
+
+\begin{theorem}[Certified vanishing subspace]\label{thm:recovery}
+Let $T$ be a symmetric trilinear form on $E=\F^h$, given by its coefficients, and let $\beta_0$ be a positive rational of bit length $b$ with $\beta_0\le\beta(T)$. Put $R=\lceil\log(1/\beta_0)\rceil$. There is a randomized algorithm that runs in expected time $\poly(h,b)/\beta_0$ and polynomial space and outputs a subspace $U\le E$ with
+\[
+\codim_EU\le\min\{h,\,5R+14\}\qquad\text{and}\qquad T|_U=0 .
+\]
+The output is verified by linear algebra, so every returned subspace is correct even if the promise $\beta_0\le\beta(T)$ is false; the promise is needed only for the running time.
+\end{theorem}
+
+\subsection{A good kernel}
+
+Draw $u,v\in E$ uniformly and keep the pair if $M_vu=0$. By~\eqref{eq:bias} a pair is kept with probability $\beta(T)$, and the marginal law of $v$ for a kept pair is
+\[
+\pi(v)=\frac{2^{-\rank M_v}}{2^h\,\beta(T)} .
+\]
+This distribution and the two moments below are the zero-set quantities of Lampert~\cite[Lemmas~2.1--2.2]{Lam25}, specialized to symmetric forms. We include the computation because it fixes the cost of rejection sampling.
+
+\begin{lemma}[Good kernels are likely]\label{lem:kernel}
+With probability at least $1/2$ over $v\sim\pi$, the subspace $V=\ker M_v$ satisfies
+\[
+\codim_EV\le R+2\qquad\text{and}\qquad\rank M_w\le2(R+3)\ \text{ for every } w\in V.
+\]
+\end{lemma}
+
+\begin{proof}
+Define $S(v)=2^{\rank M_v}+\E_{w\in\ker M_v}2^{\rank M_w}$. The first term has $\pi$-expectation $1/\beta(T)$. For the second, note that $w\in\ker M_v$ if and only if $v\in\ker M_w$, by symmetry of $T$. Hence
+\begin{align*}
+\E_{v\sim\pi}\,\E_{w\in\ker M_v}2^{\rank M_w}
+&=\frac{2^{-2h}}{\beta(T)}\sum_v\sum_{w\in\ker M_v}2^{\rank M_w}\\
+&=\frac{2^{-2h}}{\beta(T)}\sum_w2^{\rank M_w}\,|\ker M_w|=\frac{1}{\beta(T)} .
+\end{align*}
+So $\E_\pi S\le2/\beta_0$, and by Markov's inequality $S(v)\le4/\beta_0\le2^{R+2}$ with probability at least $1/2$. When this happens, the first term of $S(v)$ gives $\codim V=\rank M_v\le R+2$. The second term shows that the set $A=\{w\in V:\rank M_w\le R+3\}$ has density at least $3/4$ in $V$, because every $w$ outside $A$ contributes at least $2^{R+4}$ to the average. Two subsets of density $3/4$ intersect, so for every $w\in V$ the sets $A$ and $w+A$ meet. Writing $w=a+a'$ with $a,a'\in A$, linearity and subadditivity of rank give $\rank M_w\le2(R+3)$.
+\end{proof}
+
+The algorithm never computes $S(v)$ or the set $A$; they only bound the probability that the later check succeeds.
+
+\subsection{A common vanishing subspace}
+
+The next lemma is a constructive form of the Haramaty--Shpilka bound~\cite[Lemma~3.7]{HS10}; the rank inequality~\eqref{eq:rankineq} also appears in Ref.~\cite[Lemma~2.3]{Lam25}. The useful observation for algorithms is that \emph{any} nonzero restricted generator may be chosen at each step. The maximum rank enters the analysis, but it never has to be computed.
+
+\begin{lemma}[Common vanishing subspace]\label{lem:common}
+Let $\mathcal L$ be a linear space of symmetric bilinear forms on $E$, given by generators, such that every member of $\mathcal L$ has rank at most $\Gamma$. In polynomial time one can find $U\le E$ with $\codim_EU\le2\Gamma$ such that every form in $\mathcal L$ vanishes on $U\times U$.
+\end{lemma}
+
+\begin{proof}
+Start with $K=E$. While some generator $G$ is nonzero on $K\times K$, replace $K$ by the radical $K'=\{u\in K:G(u,v)=0\ \forall v\in K\}$ of $G|_K$, and restrict all generators to $K'$. We claim that for every symmetric form $H$ on $K$,
+\begin{equation}\label{eq:rankineq}
+\rank H+\rank(H+G)\ \ge\ 2\rank(H|_{K'})+g,\qquad g=\rank(G|_K).
+\end{equation}
+To see this, choose $J\le K'$ of dimension $r=\rank(H|_{K'})$ on which $H$ is nondegenerate. Since $J\subseteq K'$, the form $G$ vanishes on $J\times K$, so $H$ and $H+G$ agree on $J\times K$. Let $J^\perp=\{v\in K:H(j,v)=0\ \forall j\in J\}$; then $K=J\oplus J^\perp$, and the same decomposition works for $H+G$. Both forms are block diagonal with a common rank-$r$ block on $J$, and $G$ lives entirely on $J^\perp$ with rank $g$. On $J^\perp$, the two remaining blocks differ by a form of rank $g$, so their ranks add up to at least $g$. This proves~\eqref{eq:rankineq}.
+
+Let $\Gamma_i$ be the largest rank in the current restricted space; it need not be computed. Both $H$ and $H+G$ belong to that space, so~\eqref{eq:rankineq} gives $\Gamma_{i+1}\le\Gamma_i-g/2$, while the dimension of $K$ drops by $g$. Summing over all steps, the total drop in dimension is at most $2\Gamma_0\le2\Gamma$. At termination every generator, and hence every form in $\mathcal L$, vanishes on $K\times K$. Each step is binary linear algebra, and there are at most $\dim E$ steps.
+\end{proof}
+
+\subsection{Proof of Theorem~\ref{thm:recovery}}
+
+If $5R+14\ge h$ we return $U=\{0\}$. Otherwise we repeat the following. Draw a pair $(u,v)$ and discard it unless $M_vu=0$. For a kept pair, let $V=\ker M_v$, take the forms $M_w|_{V\times V}$ for a basis $w$ of $V$ as generators, and run Lemma~\ref{lem:common} to obtain $U\le V$. Check that $\codim_EU\le5R+14$ and that $T$ vanishes on all triples of basis vectors of $U$; return $U$ if both checks pass.
+
+The checks make every returned subspace correct, by trilinearity. For the running time, suppose $V$ is good in the sense of Lemma~\ref{lem:kernel}. The span of the generators is $\{M_w|_{V\times V}:w\in V\}$, and every such form has rank at most $2(R+3)$, so Lemma~\ref{lem:common} gives $\codim_VU\le4(R+3)$ and
+\[
+\codim_EU\le(R+2)+4(R+3)=5R+14 .
+\]
+Moreover $T(w,u,u')=0$ for all $w\in V$ and $u,u'\in U$, and in particular $T|_U=0$. A drawn pair is kept with probability at least $\beta_0$ and is then good with probability at least $1/2$, so each attempt succeeds with probability at least $\beta_0/2$, and each attempt costs polynomial time. \qed
+
+\paragraph{Bounded-time recovery.}
+After $\lceil2\beta_0^{-1}\ln(1/\varepsilon)\rceil$ attempts the algorithm has failed with probability at most $\varepsilon$, so a recovery with failure probability $\varepsilon$ costs time $\poly(h,b)\,\beta_0^{-1}\log(1/\varepsilon)$.
+
+\begin{remark}[On the constant five]\label{rem:constant}
+A slice-rank decomposition of $T$ with $r$ terms gives a vanishing subspace of codimension at most $r$, namely the common kernel of the linear factors; conversely, a vanishing subspace of codimension $d$ gives slice rank at most $3d$. Our leading constant $5$ coincides with the constant in Lampert's bound~\cite{Lam25} and with the bound $3+2/(q-1)$ of Moshkovitz and Zhu~\cite{MZ26} at $q=2$. Any improvement of the constant in Theorem~\ref{thm:recovery} improves all exponents in Section~\ref{sec:sampling}.
+\end{remark}
+
+\subsection{Planted vanishing subspaces}
+
+The following consequence does not need any promise about the output.
+
+\begin{corollary}[Logarithmic codimension cannot be hidden]\label{cor:planted}
+Suppose that $T$ vanishes on some, unknown, subspace of codimension $d$. Then $\beta(T)\ge2^{-3d}$. Consequently, the algorithm of Theorem~\ref{thm:recovery} with $\beta_0=2^{-3d}$ finds, in expected time $\poly(n)\,2^{3d}$, a certified subspace $U$ with $T|_U=0$ and $\codim U\le15d+14$.
+\end{corollary}
+
+\begin{proof}
+Let $U_0$ be a vanishing subspace of codimension $d$, and use the second expression in~\eqref{eq:bias}. With probability $2^{-2d}$ both $a$ and $b$ lie in $U_0$. Fix $a\in U_0$. For $b\in U_0$ the vector $M_ab$ represents the linear form $T(a,b,\cdot)$, which vanishes on $U_0$, so $M_ab$ lies in the $d$-dimensional annihilator of $U_0$. The linear map $b\mapsto M_ab$ from $U_0$ to this annihilator has a kernel of codimension at most $d$ in $U_0$, so $\Pr_{b\in U_0}[M_ab=0]\ge2^{-d}$. Hence $\beta(T)\ge2^{-2d}\cdot2^{-d}$. The second statement follows from Theorem~\ref{thm:recovery} with $R=3d$.
+\end{proof}
+
+In the Boolean case $P=4f$, a subspace on which $T$ vanishes is a subspace on which the cubic part of $f$ disappears. This is the notion of independent space used by Bl\"aser et al.~\cite{BGHLQ26}, where it is planted with dimension $h=(1-c)n$ to give the verifier a simulation secret. % TODO: check that their definition matches exactly.
+For $d=cn$, Corollary~\ref{cor:planted} only guarantees $\beta(T)\ge2^{-3cn}$, so it gives no efficient attack, which is consistent with their conjectures. Their rank-profile attack recovers planted spaces with $h\ge(1/2+\epsilon)n$ for random planted instances. In the logarithmic-codimension regime, Corollary~\ref{cor:planted} adds a worst-case guarantee with a certificate. Our Lemma~\ref{lem:kernel} is close in spirit to their attack: both look for directions $v$ whose contraction matrix $M_v$, the cubic part of the Hessian, has unusually small rank.
+
+%=================================================================
+\section{Exact sampling}\label{sec:sampling}
+%=================================================================
+
+A vanishing subspace gives an exact amplitude oracle. It is essential to keep the relative phases between the cosets: replacing the coherent sum below by a mixture would in general give the wrong distribution.
+
+\begin{lemma}[Streamed amplitudes and exact sampling]\label{lem:sampling}
+Suppose $U\le\F^n$ has codimension $d$ and $T|_U=0$. Let $W$ be an explicit Clifford circuit of size $s$. Then every amplitude $\bra{y}W'\ket{\psi_P}$, for any prefix $W'$ of $W$, can be computed exactly in time $\poly(n,s)\,2^d$ and polynomial space, and the computational-basis distribution of $W\ket{\psi_P}$ can be sampled exactly in expected time $\poly(n,s)\,2^d$ and polynomial space.
+\end{lemma}
+
+\begin{proof}
+Let $B$ be a basis matrix of $U$ and complete it by a matrix $A$ with $d$ columns to a basis of $\F^n$. For $z\in\F^d$ let
+\[
+\ket{\phi_z}=2^{-(n-d)/2}\sum_{t}\omega^{P(Az+Bt)}\ket{Az+Bt}.
+\]
+By Lemma~\ref{lem:coset}, each $\phi_z$ is a stabilizer state times an explicit eighth root of unity, and
+\begin{equation}\label{eq:decomposition}
+\ket{\psi_P}=2^{-d/2}\sum_{z\in\F^d}\ket{\phi_z}.
+\end{equation}
+For a Clifford prefix $W'$, the amplitude $\bra{y}W'\ket{\phi_z}$, including its phase, is computed by standard phase-sensitive stabilizer algorithms~\cite{DD03,BBC19}. Summing over $z$ one term at a time gives $\bra{y}W'\ket{\psi_P}$ without storing the decomposition. All amplitudes are elements of $\Z[\omega]$ divided by a power of $\sqrt2$ with polynomially bounded exponent, so their exact representations have polynomial bit length, even after the sum over $2^d$ terms.
+
+To sample we use the gate-by-gate method of Bravyi, Gosset and Liu~\cite{BGL22}. Write $W$ as a sequence of $H$, $S$, $CZ$, $CNOT$ and $X$ gates. Start from a uniformly random string $x$; this is exactly the computational-basis distribution of the flat state $\psi_P$. Diagonal gates do not change the distribution, and permutation gates update $x$ deterministically. When a Hadamard gate acts on qubit $j$, keep the other bits $\bar x_j$ fixed and redraw bit $j$ with probability
+\[
+\Pr[x_j=a]=\frac{|\bra{\bar x_j,a}W_t\ket{\psi_P}|^2}{\sum_{a'\in\{0,1\}}|\bra{\bar x_j,a'}W_t\ket{\psi_P}|^2},
+\]
+where $W_t$ is the prefix up to and including this gate. A gate on qubit $j$ does not change the marginal distribution of the other bits, so if $x$ has the correct distribution before the gate, it has the correct distribution after it. The denominator is positive for every string the procedure can reach. Each update needs two amplitudes, so the total cost is $\poly(n,s)\,2^d$; computing marginals of prefixes or overlaps between all pairs of stabilizer terms is not necessary.
+
+Unlike in the Boolean case, the redraw probabilities need not be rational. They lie in $\mathbb{Q}(\sqrt2)$; for example, $HTH\ket0$ yields $0$ with probability $(2+\sqrt2)/4$. We store each probability exactly as a quotient of numbers $a+b\sqrt2$ with integers $a,b$. To flip a coin with such a parameter $p$, we reveal the binary digits of a uniform $u\in[0,1]$ one by one and stop as soon as the dyadic interval known to contain $u$ lies entirely on one side of $p$. Each comparison reduces to the sign of a number $a'+b'\sqrt2$ with rational $a',b'$, which we decide by comparing signs and squares. After $k$ digits the coin is still undecided with probability at most $2^{-k}$, for every $p$, so the expected number of digits is at most two. This also covers exponentially small probabilities, whose exact descriptions still have polynomial bit length.
+\end{proof}
+
+\subsection{Sampling from a collision bound}
+
+\begin{theorem}[Collision and multipeak promises]\label{thm:collision}
+Given $P$, $W$, and a positive rational $\rho\le\kappa(p)$ of bit length $b$, the full output distribution $p$ of $W\ket{\psi_P}$ can be sampled exactly in expected time $\poly(n,s,b)\,\rho^{-5}$ and polynomial space. A bounded-time version has total-variation error at most $2^{-u}$ and runs in time $\poly(n,s,b,u)\,\rho^{-5}$. In particular, if $K$ unknown strings carry total probability at least $\mu$, the cost is $\poly(n,s,b)\,K^5\mu^{-10}$.
+\end{theorem}
+
+\begin{proof}
+Compute $L$ and $c$ as in Lemma~\ref{lem:collision}. By~\eqref{eq:collision}, $\beta_0=2^c\rho$ is a valid lower bound on $\beta(T|_L)$. With $R=\lceil\log(1/\rho)\rceil$, Theorem~\ref{thm:recovery} applied to $T|_L$ returns $U\le L$ with $T|_U=0$ and ambient codimension
+\[
+d\le\min\{n,\ c+5(R-c)+14\}=\min\{n,\ 5R-4c+14\},
+\]
+so that $2^d\le2^{19}\rho^{-5}$. Recovery costs $\poly(n,s,b)/\rho$, and Lemma~\ref{lem:sampling} produces the sample. For the bounded-time version, stop the recovery after $O(\beta_0^{-1}(u+1))$ attempts and each of the at most $s$ coins after $O(u+\log(s+1))$ digits, and return a fixed string if any of these caps is reached. Each kind of failure has probability at most $2^{-u-1}$, and coupling with the exact algorithm bounds the total-variation distance by $2^{-u}$. For the last statement use $\rho=\mu^2/K$.
+\end{proof}
+
+\subsection{Sampling from a magic bound}
+
+\begin{theorem}[Purity, fidelity and extent promises]\label{thm:extent}
+Given $P$, $W$, and one of the following rational bounds of bit length $b$:
+\begin{enumerate}
+\item[(a)] $\alpha\le A_2(\psi_P)$, \quad (b) $f_0\le F_S(\psi_P)$, \quad (c) $R\ge\xi(\psi_P)$,
+\end{enumerate}
+the output distribution of $W\ket{\psi_P}$ can be sampled exactly in polynomial space and expected time $\poly(n,s,b)$ times $\alpha^{-5}$, $f_0^{-15}$ or $R^{15}$, respectively. Along the way the algorithm finds an exact stabilizer decomposition of $\psi_P$, with terms generated on demand, of length at most $2^{19}\alpha^{-5}$, $2^{19}f_0^{-15}$ or $2^{19}R^{15}$. No stabilizer decomposition or witness is part of the input. Bounded-time versions with error $2^{-u}$ cost an extra factor $\poly(u)$.
+\end{theorem}
+
+\begin{proof}
+By Proposition~\ref{prop:purity}, a bound of type (a) is a bound $\beta(T)\ge\alpha$. By Theorem~\ref{thm:sharp}, a bound of type (b) gives $\beta(T)\ge f_0^3$, and since $\xi\ge1/F_S$, a bound of type (c) gives (b) with $f_0=1/R$. Theorem~\ref{thm:recovery} with $\beta_0=\alpha$ or $\beta_0=f_0^3$ returns a vanishing subspace of codimension $d\le5\lceil\log(1/\beta_0)\rceil+14$, so $2^d\le2^{19}\beta_0^{-5}$. The decomposition~\eqref{eq:decomposition} and Lemma~\ref{lem:sampling} finish the proof, with the same stopping caps as in Theorem~\ref{thm:collision}.
+\end{proof}
+
+The general inequality $A_2\ge F_S^4$ would give the same qualitative result with exponent $20$ instead of $15$ in (b) and (c); Theorem~\ref{thm:sharp} is what improves it to $15$. The proofs also give purely structural bounds, which we find worth stating separately.
+
+\begin{corollary}[Magic measures on third-level phase states]\label{cor:measures}
+For every phase polynomial~\eqref{eq:phase},
+\[
+\chi(\psi_P)\le2^{19}A_2(\psi_P)^{-5},\qquad \xi(\psi_P)\le2^{19}A_2(\psi_P)^{-5},\qquad F_S(\psi_P)\ge2^{-19}A_2(\psi_P)^{5},
+\]
+and moreover $\chi(\psi_P)\le2^{19}F_S(\psi_P)^{-10}$.
+\end{corollary}
+
+\begin{proof}
+The algorithm of Theorem~\ref{thm:recovery} with $\beta_0=\beta(T)$ succeeds with positive probability, so a vanishing subspace of codimension $d\le5\lceil\log(1/A_2)\rceil+14$ exists. The decomposition~\eqref{eq:decomposition} has $2^d$ terms with coefficients $2^{-d/2}$, so $\chi\le2^d$ and $\xi\le(2^d\cdot2^{-d/2})^2=2^d$. Its terms have disjoint supports, so $F_S\ge|\braket{\phi_z}{\psi_P}|^2=2^{-d}$. For the last bound, let $S$ be a stabilizer state with $|\braket{S}{\psi_P}|^2=F_S$, and choose a Clifford $W$ with $W^\dagger\ket{0^n}=\ket{S}$. The outcome $0^n$ of $W\ket{\psi_P}$ has probability $F_S$, so $\kappa\ge F_S^2$, and the proof of Theorem~\ref{thm:collision} gives a vanishing subspace with $2^d\le2^{19}F_S^{-10}$.
+\end{proof}
+
+Corollary~\ref{cor:measures} fails badly for general states. In the state of Remark~\ref{rem:general}, write $\phi$ in terms of $\psi$ and $\ket{0^n}$; this shows $\chi(\phi)\le\chi(\psi)+1$. Almost every state has stabilizer rank $2^n$, because the states of rank below $2^n$ lie in a finite union of proper subspaces. So $\psi$ has constant stabilizer fidelity and constant purity, but stabilizer rank at least $2^n-1$. For the family~\eqref{eq:circuit}, in contrast, purity, fidelity, extent and rank are all polynomially related. This is the converse direction to results that bound the fidelity of states with small stabilizer rank~\cite{MT24}.
+
+We stress the difference between the constructive exponent $15$ in Theorem~\ref{thm:extent} and the existential exponent $10$ in Corollary~\ref{cor:measures}. The latter uses a measurement basis that contains a maximizing stabilizer state, and a bare bound on the extent does not tell us how to find that basis.
+
+%=================================================================
+\section{A single concentrated branch is enough}\label{sec:flag}
+%=================================================================
+
+The full collision probability can be small for an uninteresting reason: many output bits may be uniformly random. Removing arbitrary bits would be dangerous, because their distribution might itself hide a hard sampling problem. There is, however, a canonical family of such bits whose law is known exactly from the public readout.
+
+Keep the notation $G,L,c$ of Lemma~\ref{lem:collision}. The diagonal part of the measured group,
+\[
+H=G\cap(\{0\}\times\F^n)=\{(0,b):b\in L^\perp\},
+\]
+has dimension $c$. A signed basis of $H$ corresponds to $c$ independent affine parities $A=(A_1,\dots,A_c)$ of the output string; we call them the \emph{canonical flags} of $W$. We complete them to an invertible affine change of coordinates $y\leftrightarrow(A,Y)$. Each flag records the eigenvalue of a $Z$-type Pauli operator on the flat state $\psi_P$, so $A$ is exactly uniform. Conditioning on $A=a$ restricts the computational support of $\psi_P$ to an affine coset $x_a+L$, and the normalized conditional state $\psi_a$ is again a flat weighted phase state.
+
+\begin{theorem}[One unknown concentrated branch]\label{thm:flag}
+Suppose that
+\[
+\max_{a\in\F^c}\kappa(Y\mid A=a)\ \ge\ \rho>0 .
+\]
+Given $P$, $W$ and a positive rational $\rho$ of bit length $b$, the full joint output distribution can be sampled exactly in expected time $\poly(n,s,b)\,\rho^{-5}$ and polynomial space, independently of $2^c$. The branch that attains the maximum need not be known. A bounded-time version with error $2^{-u}$ runs in time $\poly(n,s,b,u)\,\rho^{-5}$.
+\end{theorem}
+
+\begin{proof}
+On every coset $x_a+L$ the contraction tensor is the same restricted tensor $T_L=T|_L$, because translations do not change $T$. Within the sector $A=a$ the remaining measurement is described by $G/H$, and the projection of its labels onto translations is a bijection onto $L$. Parseval's identity in coordinates on $L$ gives
+\[
+\kappa(Y\mid A=a)=2^{-\dim L}\sum_{[Q]\in G/H}|\bra{\psi_a}Q\ket{\psi_a}|^2\ \le\ \E_{u\in L}2^{-\rank T_L(u,\cdot,\cdot)}=\beta(T_L),
+\]
+where the inequality uses Lemma~\ref{lem:flat} once for each translation $u\in L$; signs and coset-dependent lower-order phases do not matter. Hence the promise gives $\beta(T_L)\ge\rho$ without any search over $a$.
+
+Theorem~\ref{thm:recovery} now returns a single $U\le L$ with $T|_U=0$ and $\codim_LU\le5\lceil\log(1/\rho)\rceil+14$. To sample, first draw $a$ uniformly. On $x_a+L$, the conditional state splits into at most $2^{\codim_LU}$ stabilizer states as in~\eqref{eq:decomposition}, with their phases. Its computational-basis law is uniform on $x_a+L$, so we start from a uniform point of that coset and run the gate-by-gate sampler of Lemma~\ref{lem:sampling} with the full Clifford circuit $W$. The output automatically has flag $a$, because $\psi_a$ is an eigenstate of every element of $H$ with the prescribed eigenvalues. Since the sectors have disjoint outputs, averaging over the uniform flag gives the joint law. The stopping caps are the same as before.
+\end{proof}
+
+If $K$ unknown strings inside one branch carry conditional probability $\mu$, we may take $\rho=\mu^2/K$. Note that Theorem~\ref{thm:flag} does not give a short coherent stabilizer decomposition of the whole state: it samples a classical mixture over flag sectors and works coherently only inside the chosen sector.
+
+\begin{example}[A rare peak]\label{ex:flag}
+Take $m$ flag qubits $a$ and $2m$ data qubits $x$, the phase $(-1)^{g(a,x)}$ with
+\[
+g(a,x)=\sum_{j=1}^m a_jx_{2j-1}x_{2j},
+\]
+measure $a$ in the computational basis and $x$ in the Hadamard basis. An active flag $a_j=1$ turns the pair $(x_{2j-1},x_{2j})$ into a two-qubit graph state, which gives a uniform distribution on four outcomes; an inactive flag gives a deterministic pair. Therefore
+\[
+\kappa(Y\mid A=a)=4^{-|a|},\qquad\max_a\kappa(Y\mid A=a)=1,\qquad\E_a\kappa(Y\mid A=a)=(5/8)^m,
+\]
+and $\kappa(A,Y)=(5/16)^m$. The concentrated branch $a=0$ has probability $2^{-m}$, and $p_{\max}=2^{-m}$. Theorem~\ref{thm:flag} applies with $\rho=1$, although both the full and the average conditional collision probabilities are exponentially small. In this simple example $T_L=0$, so the theorem is easy to verify by hand; the phases nevertheless depend on the flags, so the output is not just an independent uniform register next to a fixed distribution.
+\end{example}
+
+\paragraph{Why the flags must be canonical.}
+If arbitrary output bits could be declared flags, one could label all outputs of a hard sampling circuit by $A$ and append one deterministic bit $Y$. Every conditional law of $Y$ would then have collision probability one, while sampling $A$ would still be the original hard problem. The canonical flags avoid this, because their diagonal pullback proves that $A$ is uniform.
+
+%=================================================================
+\section{Exceptional gates and the degree-four barrier}\label{sec:defect}
+%=================================================================
+
+So far the diagonal layer was given in the normal form~\eqref{eq:phase}. A compiled Clifford+$CCZ$ circuit need not come in this form, and recognizing whether two gate lists implement the same unitary can be hard. This section gives a promise that can be checked directly from the gate list, and it identifies a similar-looking promise for which the positive result fails under standard assumptions. For a Boolean polynomial $f$ we write $\Delta_f=\mathrm{diag}((-1)^{f})$.
+
+\subsection{A parameter read off the gate list}
+
+Consider a Clifford+$CCZ$ circuit. Move all Clifford gates to the left algebraically; each $CCZ$ gate then acts with three signed Pauli axes, namely its three $Z$ axes conjugated by the Clifford gates that precede it. The three axes of one gate commute. The axes depend only on the Clifford gates, so deleting a $CCZ$ location does not change the axes of the others.
+
+Build a conflict graph with one vertex per $CCZ$ location, and join two vertices if some axis of one anticommutes with some axis of the other. Deleting a vertex cover leaves a family of gates whose axes all commute. A proposed cover is easy to check. Alternatively, branching on the endpoints of an uncovered edge finds a cover of size at most $t$ in time $O(2^t\poly(n,s))$, and the endpoints of a maximal matching give, in polynomial time, a cover of at most twice the minimum size.
+
+\begin{theorem}[A few exceptional $CCZ$ locations]\label{thm:defect}
+Suppose that deleting $t$ vertices leaves a family of $CCZ$ gates whose axes all commute. Given a positive rational lower bound $\rho$ of bit length $b$ on the collision probability of the final output, the circuit can be sampled exactly in polynomial space and expected time
+\[
+\poly(n,s,b)\,8^t\,(5/2)^{20t}\rho^{-5}.
+\]
+A bounded-time version with error $2^{-u}$ costs an extra factor $\poly(u)$. In particular, logarithmically many exceptional gates together with inverse-polynomial collision still allow exact sampling in polynomial time, however many commuting $CCZ$ gates the circuit contains.
+\end{theorem}
+
+\begin{proof}
+Write the circuit as $CV$, where $C$ is the product of all Clifford gates and $V$ is the ordered product of the $CCZ$ gates with their transported axes. A Clifford unitary $Q$ maps all retained, mutually commuting axes to signed $Z$-type Pauli operators at once, and it can be found by standard Pauli elimination~\cite{vdBT20}. In this frame, every retained gate is $\Delta_{f_j}$ for a Boolean cubic $f_j$, a product of three affine functions.
+
+An exceptional gate with commuting signed axes $P_1,P_2,P_3$ satisfies the exact identity
+\[
+I-\tfrac14(I-P_1)(I-P_2)(I-P_3)=\tfrac34I+\tfrac14\sum_{\emptyset\neq S\subseteq\{1,2,3\}}(-1)^{|S|+1}\prod_{j\in S}P_j .
+\]
+We expand only the $t$ exceptional gates. This gives $B=8^t$ branches whose coefficients have absolute values summing to at most $\Lambda=(5/2)^t$. In each branch we push the Pauli operators to the left through the retained gates, using $\Delta_fX^aZ^b=X^aZ^b\Delta_{f(\cdot+a)}$. A translation changes a cubic only by a quadratic, so
+\begin{equation}\label{eq:branches}
+CV=CQ\sum_{\iota=1}^{B}\alpha_\iota\,P_\iota\,\Delta_{f+q_\iota}\,Q^\dagger,\qquad \deg q_\iota\le2,\qquad\sum_\iota|\alpha_\iota|\le\Lambda,
+\end{equation}
+where $f=\sum_jf_j$ is the same in every branch. The description of each branch is generated from its index in polynomial space.
+
+Next we handle the stabilizer input without assuming full support. Write $Q^\dagger\ket{0^n}=V_0(Q_0\ket{+^r}\otimes\ket{0^{n-r}})$ with $V_0$ an affine permutation and $Q_0$ a diagonal Clifford gate, including odd powers of $i$, and put $F_0=V_0(Q_0\otimes H^{\otimes(n-r)})$. Restricting $f$ and $q_\iota$ to $V_0(z,0)$ and extending them without dependence on the remaining variables gives a cubic $g$ and quadratics $\hat q_\iota$. With $W=CQF_0$ and the Pauli operators $A_\iota=F_0^\dagger P_\iota F_0$, the normalized branch $\iota$ is
+\[
+W A_\iota\Delta_{\hat q_\iota}\ket{\psi_{4g}} .
+\]
+All branches have the same cubic tensor, that of $g$. They also have the same projection $L$ in the sense of Lemma~\ref{lem:collision}: conjugation by a Pauli operator changes only signs, and conjugation by a diagonal Clifford gate does not change the $X$-part of a Pauli label. If $v_\iota$ is the output amplitude vector of branch $\iota$, Lemma~\ref{lem:collision} gives $\|v_\iota\|_4^4\le2^{-c}\beta(T_L)$ for every $\iota$. The output amplitude vector of the circuit is $\sum_\iota\alpha_\iota v_\iota$, and Minkowski's inequality controls this coherent sum:
+\[
+\rho^{1/4}\le\Big\|\sum_\iota\alpha_\iota v_\iota\Big\|_4\le\Lambda\left(2^{-c}\beta(T_L)\right)^{1/4}.
+\]
+No individual branch needs to be concentrated. The resulting bound $\beta(T_L)\ge2^c\rho/\Lambda^4$ and Theorem~\ref{thm:recovery} give a certified $U_0\le L$ with ambient codimension
+\[
+d\le5\left\lceil\log(\Lambda^4/\rho)\right\rceil-4c+14,\qquad 2^d\le2^{19}\Lambda^{20}\rho^{-5}.
+\]
+
+To sample, we use the single Clifford circuit $W$, not prefixes of the original circuit. Each $A_\iota\Delta_{\hat q_\iota}\psi_{4g}$ equals $\psi_{4g}$ times a constant root of unity and a Boolean quadratic sign. Hence the actual input to $W$ is the state $\chi$ with
+\[
+\braket{x}{\chi}=2^{-n/2}(-1)^{g(x)}h(x),\qquad h(x)=\sum_\iota\gamma_\iota(-1)^{r_\iota(x)},\qquad\deg r_\iota\le2,\qquad\sum_\iota|\gamma_\iota|\le\Lambda .
+\]
+Unitarity gives $\E_x|h(x)|^2=1$, and $|h(x)|\le\Lambda$. Draw $x$ uniformly and accept it with probability $|h(x)|^2/\Lambda^2$; this produces the exact computational-basis law of $\chi$ after $\Lambda^2$ proposals on average, each costing $\poly(n,s)B$. Every $g+r_\iota$ is quadratic on the cosets of $U_0$, so every amplitude of a Clifford prefix applied to $\chi$ costs $\poly(n,s)\,B\,2^d$, by the streaming argument of Lemma~\ref{lem:sampling}. The gate-by-gate update of Lemma~\ref{lem:sampling} now applies with this initial law. The amplitude stage dominates and gives the stated bound. Capping the initialization after $O(\Lambda^2u)$ proposals, together with the caps used before, gives the bounded-time version.
+\end{proof}
+
+\paragraph{An approximate counterpart.}
+Theorem~\ref{thm:defect} is not the first approximate simulation in this regime. A Pauli expectation of $\chi$ with translation $a$ is, up to a unit factor, $\E_x(-1)^{g(x+a)+g(x)+b\cdot x}h(x+a)\overline{h(x)}$, and expanding the product gives $B^2$ quadratic Gauss sums. This provides the estimates of prefix probabilities needed for heavy-output search~\cite{SV13}. Since $\max_yp(y)\ge\kappa(p)$, the search finds a string of probability at least $\rho/2$, and at least one normalized branch then has an output of probability $\Omega(\rho/\Lambda^2)$. From such a stabilizer seed, sparsification~\cite{BBC19} gives an approximate sampler with error $\varepsilon$ in time polynomial in $\Lambda$, $1/\rho$ and $1/\varepsilon$. Theorem~\ref{thm:defect} adds an exact shared certificate, polynomial space, and logarithmic dependence on the precision.
+
+\subsection{Why the number of locations matters}
+
+It is tempting to count \emph{distinct} non-commuting axes, or the rank of the symplectic form on the span of all axes, instead of gate locations. Both are weaker promises, and the next proposition shows that they already allow a hard sampling problem to hide in a single branch.
+
+\begin{proposition}[Degree-four barrier]\label{prop:quartic}
+For every cubic polynomial $g$ on $m$ variables there is a Clifford+$CCZ$ circuit with $\poly(m)$ gates such that: the symplectic form on the span of all transported axes has rank at most two; deleting a single distinct axis leaves a commuting family; the output has two strings of probability $1/4$ each; and, conditioned on an event of probability $1/2$, the output distribution is the cubic IQP distribution $|A_g(y)|^2$ with $A_g(y)=2^{-m}\sum_x(-1)^{g(x)+y\cdot x}$.
+\end{proposition}
+
+\begin{proof}
+A clean work qubit $w$ implements a quartic monomial: the sequence $\mathrm{Toffoli}_{i,j\to w}$, $CCZ_{w,k,l}$, $\mathrm{Toffoli}_{i,j\to w}$ returns $w$ to zero and multiplies the data by $(-1)^{x_ix_jx_kx_l}$. Writing each Toffoli gate as $H_w\,CCZ_{i,j,w}\,H_w$ and reusing the work qubit for every monomial, the transported data axes all commute, and the only anticommuting pair is $X_w,Z_w$. So the symplectic form on the span of the axes has rank at most two, and deleting the single distinct axis $X_w$ leaves a commuting set. Many gate locations, however, use this axis.
+
+With such gadgets and ordinary $CCZ$, $CZ$ and $Z$ gates we realize the phase $(-1)^{F}$ with $F(\tau,z,x)=\tau(g(x)+z)$ on qubits $\tau$, $z$ and $x$, and we measure all qubits in the Hadamard basis. Summing over $z$ first gives the output amplitudes
+\[
+A_F(a,b,y)=\begin{cases}\tfrac12\,\mathbf 1[y=0], & b=0,\\[2pt] \tfrac12(-1)^aA_g(y), & b=1,\end{cases}
+\]
+where $a$, $b$ and $y$ are the outcomes on $\tau$, $z$ and $x$. The outcomes $(a,0,0)$ for $a\in\{0,1\}$ are two peaks of probability $1/4$, the event $b=1$ has probability $1/2$, and conditioned on it the outcome $y$ has law $|A_g(y)|^2$.
+\end{proof}
+
+An efficient exact sampler justified only by the rank of the transported symplectic form, together with a collision bound, would therefore give an exact sampler for general cubic IQP circuits, which would collapse the polynomial hierarchy~\cite{BJS11}; an approximate version would contradict the conjectures of Ref.~\cite{BMS16}. This is a conditional boundary, not an unconditional separation, and the circuit of Proposition~\ref{prop:quartic} is of course not a secure verification protocol: a verifier who only checks the two easy peaks is trivially fooled.
+
+%=================================================================
+\section{Discussion}\label{sec:discussion}
+%=================================================================
+
+For circuits with one layer of third-level diagonal gates between Clifford circuits, we have shown that the usual signatures of a planted structure, namely concentrated outputs, low magic and concentrated canonical branches, all force the contraction tensor to vanish on a subspace of small codimension, and that such a subspace can be found and certified classically. The sharp inequality $A_2\ge F_S^3$ is the quantitative core of this picture: in this family, magic cannot hide in an unstructured remainder.
+
+The bounds come with large constants and exponents. They establish asymptotic simulability, not a competitive attack on a particular experiment of finite size. Exactness refers to the ideal gate model; we make no claim about noisy devices. Several questions remain open.
+\begin{itemize}
+\item \emph{Constants.} Can the codimension constant five in Theorem~\ref{thm:recovery} be improved over $\F$? By Remark~\ref{rem:constant}, this is closely tied to the slice-rank problem for trilinear forms, and any improvement lowers the exponents $5$ and $15$.
+\item \emph{Constructive versus existential.} Can a bare extent bound be turned into a decomposition of length $\poly(R)$ with the existential exponent $10$ of Corollary~\ref{cor:measures}, without first finding a maximizing stabilizer state?
+\item \emph{Other flags.} Does an exact result similar to Theorem~\ref{thm:flag} hold for flags whose distribution is efficiently samplable but whose pullbacks are not diagonal?
+\item \emph{Linear codimension.} In the regime of planted independent spaces of linear codimension~\cite{BGHLQ26}, can the analytic-rank viewpoint give average-case attacks, or evidence of hardness?
+\item \emph{Beyond the third level.} Proposition~\ref{prop:quartic} shows that a naive extension to degree four meets IQP hardness. Which promises, if any, work for continuous angles or for higher levels of the Clifford hierarchy?
+\end{itemize}
+
+\section*{Acknowledgments}
+% TODO: thank colleagues, add funding information, and add an AI-use disclosure if applicable.
+
+\appendix
+
+%=================================================================
+\section{Finite checks}\label{app:checks}
+%=================================================================
+
+The proofs above are complete. We used small exact computations only to look for counterexamples and implementation mistakes; none of them is an implementation of the large-instance sampler, and none of them says anything about asymptotic running times.
+\begin{itemize}
+\item \emph{Weighted phases.} We tested the rank inequality~\eqref{eq:rankineq}, the third differences~\eqref{eq:third}, the flat spectra of Lemma~\ref{lem:flat}, and the collision bound of Lemma~\ref{lem:collision} on random small instances. Binary ranks and biases were computed exactly.
+\item \emph{Purity and fidelity.} We compared Proposition~\ref{prop:purity} and Theorem~\ref{thm:sharp} against all stabilizer states on one, two and three qubits for sampled weighted phases, and tested random restrictions to affine supports. Complex overlaps in these tests use double precision with explicit tolerances.
+\item \emph{Sharpness family.} We enumerated all $174{,}760$ contraction directions of the states $\psi_{4g_m}$ with $m\le8$ and verified~\eqref{eq:sharpness} and the overlap $1/2$ in exact rational arithmetic.
+\item \emph{Exact coins.} We tested sign decisions and dyadic comparisons in $\mathbb{Q}(\sqrt2)$, including the probability $(2+\sqrt2)/4$ of $HTH\ket0$ and nearly cancelling cases built from Pell numbers.
+\item \emph{Sampler.} We propagated the complete distribution through the gate-by-gate updates on $50$ small instances and compared $730$ prefix distributions with the exact Born rule, including $385$ irrational conditional probabilities and $23$ fibres of probability zero. We found no discrepancy.
+\item \emph{Flags and branches.} We checked the quadratic character sums and branchwise bounds of Section~\ref{sec:flag} in integer and rational arithmetic, and reconstructed the coherent branches~\eqref{eq:branches} on small dense examples. For $n=5$ and $t=2$ the final collision estimate in the proof of Theorem~\ref{thm:defect} exceeds one in every trial, so those runs test the branch algebra only, not the strength of the bound.
+\end{itemize}
+The scripts, seeds and output logs are available at \texttt{TODO: repository URL}.
+
+%=================================================================
+\begin{thebibliography}{99}
+%=================================================================
+
+\bibitem{AZ24} S. Aaronson and Y. Zhang, \emph{On verifiable quantum advantage with peaked circuit sampling}, arXiv:2404.14493 (2024).
+
+\bibitem{Zha25} Y. Zhang, \emph{Complexity and hardness of random peaked circuits}, arXiv:2510.00132 (2025).
+
+\bibitem{GMS25} H. Gharibyan, M. Z. Mullath, N. E. Sherman, V. P. Su, H. Tepanyan, and Y. Zhang, \emph{Heuristic quantum advantage with peaked circuits}, arXiv:2510.25838 (2025).
+
+\bibitem{KD26} D. Kremer and N. Dupuis, \emph{Efficient classical simulation of heuristic peaked quantum circuits}, arXiv:2604.21908 (2026).
+
+\bibitem{Yan26} B. Yan, \emph{Classical verification of quantum advantage via Clifford obfuscation}, arXiv:2608.15963 (2026).
+
+\bibitem{BGHLQ26} M. Bl\"aser, M. Gullans, D. Hangleiter, Y. Liu, and Y. Qiao, \emph{Verifiable quantum advantage based on polynomials with planted structures}, arXiv:2609.39918 (2026).
+
+\bibitem{DFGG25} A. Deshpande, B. Fefferman, S. Ghosh, M. J. Gullans, et al., \emph{Efficiently verifiable quantum advantage using error correction}, arXiv:2510.05262 (2025). % TODO: complete the author list
+
+\bibitem{ZZ24} Y. Zhang and Y. Zhang, \emph{Classical simulability of quantum circuits with shallow magic depth}, arXiv:2409.13809 (2024).
+
+\bibitem{BJS11} M. J. Bremner, R. Jozsa, and D. J. Shepherd, \emph{Classical simulation of commuting quantum computations implies collapse of the polynomial hierarchy}, Proc. R. Soc. A \textbf{467}, 459 (2011).
+
+\bibitem{BMS16} M. J. Bremner, A. Montanaro, and D. J. Shepherd, \emph{Average-case complexity versus approximate simulation of commuting quantum computations}, Phys. Rev. Lett. \textbf{117}, 080501 (2016).
+
+\bibitem{LOH22} L. Leone, S. F. E. Oliviero, and A. Hamma, \emph{Stabilizer R\'enyi entropy}, Phys. Rev. Lett. \textbf{128}, 050402 (2022).
+
+\bibitem{LW22} Z.-W. Liu and A. Winter, \emph{Many-body quantum magic}, PRX Quantum \textbf{3}, 020333 (2022).
+
+\bibitem{HP23} T. Haug and L. Piroli, \emph{Stabilizer entropies and nonstabilizerness monotones}, Quantum \textbf{7}, 1092 (2023), \href{https://doi.org/10.22331/q-2023-08-28-1092}{doi:10.22331/q-2023-08-28-1092}.
+
+\bibitem{HLK24} T. Haug, S. Lee, and M. S. Kim, \emph{Efficient quantum algorithms for stabilizer entropies}, Phys. Rev. Lett. \textbf{132}, 240602 (2024).
+
+\bibitem{TFH25} P. S. Tarabunga, M. Frau, T. Haug, E. Tirrito, and L. Piroli, \emph{A nonstabilizerness monotone from stabilizerness asymmetry}, Quantum Sci. Technol. \textbf{10}, 045026 (2025).
+
+\bibitem{KT26} D. Kagamihara and S. Tsuchiya, \emph{Stabilizer R\'enyi entropy of 3-uniform hypergraph states}, arXiv:2602.23687 (2026).
+
+\bibitem{CYZ24} J. Chen, Y. Yan, and Y. Zhou, \emph{Magic of quantum hypergraph states}, Quantum \textbf{8}, 1351 (2024).
+
+\bibitem{Lov19} S. Lovett, \emph{The analytic rank of tensors and its applications}, Discrete Analysis 2019:7 (2019).
+
+\bibitem{GT09} B. Green and T. Tao, \emph{The distribution of polynomials over finite fields, with applications to the Gowers norms}, Contrib. Discrete Math. \textbf{4}, 1 (2009).
+
+\bibitem{HS10} E. Haramaty and A. Shpilka, \emph{On the structure of cubic and quartic polynomials}, in Proc. STOC 2010, pp.~331--340, arXiv:0908.2853.
+
+\bibitem{AKZ21} K. Adiprasito, D. Kazhdan, and T. Ziegler, \emph{On the Schmidt and analytic ranks for trilinear forms}, arXiv:2102.03659 (2021).
+
+\bibitem{CM22} A. Cohen and G. Moshkovitz, \emph{Structure vs.\ randomness for bilinear maps}, Discrete Analysis 2022:12 (2022).
+
+\bibitem{Lam25} A. Lampert, \emph{Slice rank and analytic rank for trilinear forms}, Discrete Analysis 2025:25 (2025).
+
+\bibitem{MZ26} G. Moshkovitz and D. G. Zhu, \emph{Schur complements for tensors and multilinear commutative rank}, arXiv:2603.11038 (2026).
+
+\bibitem{CGK17} S. X. Cui, D. Gottesman, and A. Krishna, \emph{Diagonal gates in the Clifford hierarchy}, Phys. Rev. A \textbf{95}, 012329 (2017).
+
+\bibitem{DD03} J. Dehaene and B. De Moor, \emph{Clifford group, stabilizer states, and linear and quadratic operations over GF(2)}, Phys. Rev. A \textbf{68}, 042318 (2003).
+
+\bibitem{BBC19} S. Bravyi, D. Browne, P. Calpin, E. Campbell, D. Gosset, and M. Howard, \emph{Simulation of quantum circuits by low-rank stabilizer decompositions}, Quantum \textbf{3}, 181 (2019).
+
+\bibitem{Mon17} A. Montanaro, \emph{Quantum circuits and low-degree polynomials over $\mathbb{F}_2$}, J. Phys. A \textbf{50}, 084002 (2017).
+
+\bibitem{BGL22} S. Bravyi, D. Gosset, and Y. Liu, \emph{How to simulate quantum measurement without computing marginals}, Phys. Rev. Lett. \textbf{128}, 220503 (2022).
+
+\bibitem{SV13} M. Schwarz and M. Van den Nest, \emph{Simulating quantum circuits with sparse output distributions}, arXiv:1310.6749 (2013).
+
+\bibitem{BGL24} S. Bravyi, D. Gosset, and Y. Liu, \emph{Classical simulation of peaked shallow quantum circuits}, arXiv:2309.08405 (2023).
+
+\bibitem{CGN26} M. Coudron, M. J. Gullans, J. Nelson, J. Rajakumar, and S. J. S. Tan, \emph{Polynomial-time additive-error estimation of output probabilities for shallow quantum circuits}, arXiv:2610.02146 (2026).
+
+\bibitem{Zha26} Y. Zhang, \emph{Polynomial-time sampling from peaked shallow quantum circuits with arbitrary connectivity}, version~1, 22 October 2026, author-hosted preprint, \url{https://yuxuanzhang1995.github.io/assets/pdf/agentic/peaked-shallow-circuit-sampling.pdf}.
+
+\bibitem{AD25} S. Arunachalam and A. Dutt, \emph{Learning stabilizer structure of quantum states}, arXiv:2510.05890 (2025).
+
+\bibitem{AD26} S. Arunachalam and A. Dutt, \emph{Tomography of quantum states with bounded extent}, arXiv:2606.07425 (2026).
+
+\bibitem{ADGG26} S. Arunachalam, A. Dutt, S. Grewal, and A. Gupte, \emph{Marton's conjecture in polynomial time}, arXiv:2609.20771 (2026).
+
+\bibitem{SL26} P. Sinha and B. Lovitz, \emph{Improved bounds on stabilizer extent and Clifford rank}, arXiv:2610.06819 (2026).
+
+\bibitem{MT24} S. Mehraban and M. Tahmasbi, \emph{Improved bounds for testing low stabilizer complexity states}, arXiv:2410.24202 (2024).
+
+\bibitem{vdBT20} E. van den Berg and K. Temme, \emph{Circuit optimization of Hamiltonian simulation by simultaneous diagonalization of Pauli clusters}, Quantum \textbf{4}, 322 (2020).
+
+\end{thebibliography}
+
+\end{document}
